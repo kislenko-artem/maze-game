@@ -2,17 +2,15 @@ package main
 
 import (
 	"fmt"
-	"image"
-	"image/color"
-	"log"
-	"math"
-	"time"
-
 	"golang.org/x/exp/shiny/driver"
 	"golang.org/x/exp/shiny/screen"
 	"golang.org/x/mobile/event/key"
 	"golang.org/x/mobile/event/lifecycle"
 	"golang.org/x/mobile/event/paint"
+	"image"
+	"image/color"
+	"log"
+	"math"
 )
 
 type Player struct {
@@ -24,7 +22,7 @@ type Player struct {
 var renderMap = []string{
 	"0000000000000000",
 	"0              1",
-	"0      2       0",
+	"0              0",
 	"0  11111       0",
 	"0  1           0",
 	"0111           0000000",
@@ -40,6 +38,7 @@ var renderMap = []string{
 	"0100000000000010",
 }
 var (
+	white    = color.RGBA{0xff, 0xff, 0xff, 0xff}
 	blue0    = color.RGBA{0x00, 0x00, 0x1f, 0xff}
 	blue1    = color.RGBA{0x00, 0x00, 0x3f, 0xff}
 	darkGray = color.RGBA{0x3f, 0x3f, 0x3f, 0xff}
@@ -52,8 +51,11 @@ var (
 )
 
 func main() {
-	var player = Player{X: 2, Y: 2, A: 0}
-	var c float64
+	var (
+		player = Player{X: 2, Y: 2, A: 0}
+		renderMapCache = map[int]map[int]string{}
+		c float64
+	)
 	const (
 		fov = 3.14 / 3.0 // field of view
 		wWidth = 800
@@ -71,11 +73,7 @@ func main() {
 			fmt.Println(err)
 			return
 		}
-
-		var (
-			t0RectCache = map[int]map[string]screen.Texture{}
-			renderMapCache = map[int]map[int]string{}
-		)
+		defer w.Release()
 
 		// кеширование  карты
 		for x := 0; x < len(renderMap); x++ {
@@ -85,28 +83,9 @@ func main() {
 			}
 		}
 
-		// кеширование создания изображения
-		for y := 0; y <= wHeight; y += 1 {
-			for keyColor := range colorMap {
-				if _, ok := t0RectCache[y]; !ok {
-					t0RectCache[y] = map[string]screen.Texture{}
-				}
 
-				size0 := image.Point{5, y}
-				t0, err := s.NewTexture(size0)
-				if err != nil {
-					log.Fatal(err)
-				}
-				t0.Fill(t0.Bounds(), colorMap[keyColor], screen.Src)
-				t0RectCache[y][keyColor] = t0
-			}
-		}
-
-
-		defer w.Release()
 		for {
 			e := w.NextEvent()
-			//fmt.Println(e)
 			switch e := e.(type) {
 			case lifecycle.Event:
 				if e.To == lifecycle.StageDead {
@@ -156,14 +135,7 @@ func main() {
 
 				}
 			case paint.Event:
-				// https://github.com/golang/exp/blob/master/shiny/example/basic/main.go
 				colorSign := ""
-				op := screen.Src
-				w.Fill(image.Rectangle{image.Point{0, 0}, image.Point{wWidth, wHeight}}, blue1, screen.Src)
-				var (
-					timeStart = time.Now()
-					//timeNorm = time.Second / 25 / wWidth / 2
-				)
 				if player.X < 1 {
 					player.X = 1
 				}
@@ -177,66 +149,61 @@ func main() {
 					player.Y = float64(len(renderMap[int(player.X)]) - 2)
 				}
 
-				if renderMapCache[int(player.X) + 1][int(player.Y)] != " " {
-					player.X = player.X - 1
+				//if renderMapCache[int(player.X) + 1][int(player.Y)] != " " {
+				//	player.X = player.X - 1
+				//}
+				//
+				//if renderMapCache[int(player.X) - 1][int(player.Y)] != " " {
+				//	player.X = player.X + 1
+				//}
+				//
+				//if renderMapCache[int(player.X)][int(player.Y) - 1] != " " {
+				//	player.Y = player.Y + 1
+				//}
+				//
+				//if renderMapCache[int(player.X)][int(player.Y) + 1] != " " {
+				//	player.Y = player.Y - 1
+				//}
+				size0 := image.Point{wWidth, wHeight, }
+				imgBuf, err := s.NewBuffer(size0)
+				if err != nil {
+					log.Fatal(err)
 				}
+				defer imgBuf.Release()
+				img := imgBuf.RGBA()
 
-				if renderMapCache[int(player.X) - 1][int(player.Y)] != " " {
-					player.X = player.X + 1
-				}
-
-				if renderMapCache[int(player.X)][int(player.Y) - 1] != " " {
-					player.Y = player.Y + 1
-				}
-
-				if renderMapCache[int(player.X)][int(player.Y) + 1] != " " {
-					player.Y = player.Y - 1
-				}
-
-
-
-				for i := 0; i <= wWidth; i+=5 {
-					//timeStart2 := time.Now()
+				for i := 0; i <= wWidth; i+=1 {
 					angle := float64(player.A) - fov/2.0 + fov*float64(i)/float64(wWidth)
 					for c = 0.0; c <= 20; c += 0.01 {
 						x := player.X + c*math.Sin(angle)
 						y := player.Y + c*math.Cos(angle)
-
-						//fmt.Println(c, "x", x, y, string([]byte(renderMap[int(x)])[int(y)]))
 						colorSign = renderMapCache[int(x)][int(y)]
 						if colorSign != " " {
 							break
 						}
 
 					}
-					//if time.Now().Sub(timeStart2) > timeNorm {
-					//	fmt.Println("1", time.Now().Sub(timeStart2))
-					//}
-					//timeStart2 = time.Now()
-					//fmt.Println("angle", angle, "c", c, "player.A", player.A, math.Cos(player.A), math.Sin(player.A))
-
 					if colorSign == " " || colorSign == "" {
 						continue
 					}
-					sizeY := int(wHeight / (c * math.Cos(angle - player.A)))
+					sizeY := int(wHeight / (c * math.Cos(angle - player.A))) + (wHeight / 5)
 					if sizeY > wHeight {
 						sizeY = wHeight
 					}
 					if sizeY < 0 {
 						sizeY = 0
 					}
-					//if time.Now().Sub(timeStart2) > timeNorm {
-					//	fmt.Println("2", time.Now().Sub(timeStart2))
-					//}
-					//timeStart2 = time.Now()
-					w.Copy(image.Point{i, int(c)}, t0RectCache[sizeY][colorSign],
-						t0RectCache[sizeY][colorSign].Bounds(), op, nil)
-					//if time.Now().Sub(timeStart2) > timeNorm {
-					//	fmt.Println("3", time.Now().Sub(timeStart2))
-					//}
+
+					for b := 0; b < wHeight; b++ {
+						if b > sizeY {
+							img.SetRGBA(i, b, white)
+							continue
+						}
+						img.SetRGBA(i, b, colorMap[colorSign])
+					}
 
 				}
-				fmt.Println("render duration: ", time.Now().Sub(timeStart))
+				w.Upload(image.Point{0, 0}, imgBuf, imgBuf.Bounds())
 				w.Publish()
 			case error:
 				log.Print(e)
