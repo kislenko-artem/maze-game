@@ -20,9 +20,9 @@ type Player struct {
 	A float64
 }
 
-var renderMap =[]string{
+var renderMap = []string{
 	"0000000000000000",
- 	"1              1",
+	"1              1",
 	"2              0",
 	"3              0",
 	"1              0",
@@ -49,10 +49,11 @@ var (
 	cos30 = math.Cos(math.Pi / 6)
 	sin30 = math.Sin(math.Pi / 6)
 )
+
 func main() {
 	var player = Player{X: 1, Y: 4, A: 0}
-	var c float64;
-	const fov = 3.14/3.0; // field of view
+	var c float64
+	const fov = 3.14 / 3.0 // field of view
 	colorMap := map[string]color.RGBA{
 		"0": yellow,
 		"1": green,
@@ -60,7 +61,7 @@ func main() {
 		"3": darkGray,
 	}
 	driver.Main(func(s screen.Screen) {
-		w, err := s.NewWindow(&screen.NewWindowOptions{Width: 300, Height: 300, Title: "Game" })
+		w, err := s.NewWindow(&screen.NewWindowOptions{Width: 300, Height: 300, Title: "Game"})
 		if err != nil {
 			fmt.Println(err)
 			return
@@ -82,22 +83,38 @@ func main() {
 				if e.Direction == key.DirRelease {
 					if e.Code == key.CodeLeftArrow {
 						player.A -= 0.25
+						if player.A < -6 {
+							player.A = 0
+						}
 					}
 					if e.Code == key.CodeRightArrow {
 						player.A += 0.25
+						if player.A > 6 {
+							player.A = 0
+						}
 					}
+					cosDirection := math.Round(math.Cos(player.A))
+					sinDirection := math.Round(math.Sin(player.A))
+					backFroward := &player.X
+					rightLeft := &player.Y
+
 					if e.Code == key.CodeD {
-						player.Y += 1
+						*rightLeft += sinDirection
+						*backFroward += cosDirection
 					}
 					if e.Code == key.CodeA {
-						player.Y -= 1
+						*rightLeft -= sinDirection
+						*backFroward -= cosDirection
 					}
 					if e.Code == key.CodeW {
-						player.X += 1
+						*rightLeft += cosDirection
+						*backFroward += sinDirection
 					}
 					if e.Code == key.CodeS {
-						player.X -= 1
+						*rightLeft -= cosDirection
+						*backFroward -= sinDirection
 					}
+					fmt.Println("a", player.A, "cos", cosDirection, "sin", sinDirection, "x", player.X, "y", player.Y)
 					w.Send(paint.Event{})
 
 				}
@@ -107,10 +124,10 @@ func main() {
 				op := screen.Src
 				w.Fill(image.Rectangle{image.Point{0, 0}, image.Point{300, 300}}, blue1, screen.Src)
 				for i := 0; i <= 300; i++ {
-					angle := float64(player.A) - fov / 2.0 + fov * float64(i) / float64(300);
-					for c = 0.0; c<= 18; c += 0.05 {
-						x := player.X + c * math.Sin(angle)
-						y := player.Y + c * math.Cos(angle)
+					angle := float64(player.A) - fov/2.0 + fov*float64(i)/float64(300)
+					for c = 0.0; c <= 18; c += 0.05 {
+						x := player.X + c*math.Sin(angle)
+						y := player.Y + c*math.Cos(angle)
 
 						//fmt.Println(c, "x", x, y, string([]byte(renderMap[int(x)])[int(y)]))
 						colorSign = string([]byte(renderMap[int(x)])[int(y)])
@@ -118,12 +135,12 @@ func main() {
 							break
 						}
 					}
-					fmt.Println("angle", angle, "c", c, "player.A", player.A, math.Cos(player.A), math.Sin(player.A))
+					//fmt.Println("angle", angle, "c", c, "player.A", player.A, math.Cos(player.A), math.Sin(player.A))
 
 					if colorSign == " " {
 						continue
 					}
-					size0 := image.Point{1, int(500/(c*2))}
+					size0 := image.Point{1, int(500 / (c * 2))}
 					t0, err := s.NewTexture(size0)
 					if err != nil {
 						log.Fatal(err)
@@ -131,7 +148,7 @@ func main() {
 					t0.Fill(t0.Bounds(), colorMap[colorSign], screen.Src)
 					t0Rect := t0.Bounds()
 
-					w.Copy(image.Point{i, int(500/(c*2))}, t0, t0Rect, op, nil)
+					w.Copy(image.Point{i, int(500 / (c * 2))}, t0, t0Rect, op, nil)
 
 				}
 				w.Publish()
