@@ -6,6 +6,7 @@ import (
 	"image/color"
 	"log"
 	"math"
+	"time"
 
 	"golang.org/x/exp/shiny/driver"
 	"golang.org/x/exp/shiny/screen"
@@ -22,17 +23,17 @@ type Player struct {
 
 var renderMap = []string{
 	"0000000000000000",
-	"1              1",
-	"2              0",
-	"3              0",
-	"1              0",
-	"2              0",
-	"3              0",
-	"0           1  0",
+	"0              1",
+	"0      2       0",
+	"0  11111       0",
+	"0  1           0",
+	"0111           0000000",
+	"0                    0",
+	"0              0000000",
 	"0              0",
-	"0      3       0",
 	"0              0",
-	"0   2          0",
+	"0              0",
+	"0              0",
 	"0              0",
 	"0              0",
 	"0              0",
@@ -51,12 +52,12 @@ var (
 )
 
 func main() {
-	var player = Player{X: 2, Y: 4, A: 0}
+	var player = Player{X: 2, Y: 2, A: 0}
 	var c float64
 	const (
 		fov = 3.14 / 3.0 // field of view
-		wWidth = 600
-		wHeight = 400
+		wWidth = 800
+		wHeight = 600
 	)
 	colorMap := map[string]color.RGBA{
 		"0": yellow,
@@ -70,6 +71,38 @@ func main() {
 			fmt.Println(err)
 			return
 		}
+
+		var (
+			t0RectCache = map[int]map[string]screen.Texture{}
+			renderMapCache = map[int]map[int]string{}
+		)
+
+		// кеширование  карты
+		for x := 0; x < len(renderMap); x++ {
+			renderMapCache[x] = map[int]string{}
+			for y := 0; y < len(renderMap[x]); y++ {
+				renderMapCache[x][y] = string([]byte(renderMap[int(x)])[int(y)])
+			}
+		}
+
+		// кеширование создания изображения
+		for y := 0; y <= wHeight; y += 1 {
+			for keyColor := range colorMap {
+				if _, ok := t0RectCache[y]; !ok {
+					t0RectCache[y] = map[string]screen.Texture{}
+				}
+
+				size0 := image.Point{5, y}
+				t0, err := s.NewTexture(size0)
+				if err != nil {
+					log.Fatal(err)
+				}
+				t0.Fill(t0.Bounds(), colorMap[keyColor], screen.Src)
+				t0RectCache[y][keyColor] = t0
+			}
+		}
+
+
 		defer w.Release()
 		for {
 			e := w.NextEvent()
@@ -128,41 +161,82 @@ func main() {
 				op := screen.Src
 				w.Fill(image.Rectangle{image.Point{0, 0}, image.Point{wWidth, wHeight}}, blue1, screen.Src)
 				var (
-					prevSize int
-					t0 screen.Texture
-					t0Rect image.Rectangle
+					timeStart = time.Now()
+					//timeNorm = time.Second / 25 / wWidth / 2
 				)
+				if player.X < 1 {
+					player.X = 1
+				}
+				if player.Y < 1 {
+					player.Y = 1
+				}
+				if player.X > float64(len(renderMap) - 2) {
+					player.X = float64(len(renderMap) - 2)
+				}
+				if player.Y > float64(len(renderMap[int(player.X)]) - 2) {
+					player.Y = float64(len(renderMap[int(player.X)]) - 2)
+				}
+
+				if renderMapCache[int(player.X) + 1][int(player.Y)] != " " {
+					player.X = player.X - 1
+				}
+
+				if renderMapCache[int(player.X) - 1][int(player.Y)] != " " {
+					player.X = player.X + 1
+				}
+
+				if renderMapCache[int(player.X)][int(player.Y) - 1] != " " {
+					player.Y = player.Y + 1
+				}
+
+				if renderMapCache[int(player.X)][int(player.Y) + 1] != " " {
+					player.Y = player.Y - 1
+				}
+
+
+
 				for i := 0; i <= wWidth; i+=5 {
+					//timeStart2 := time.Now()
 					angle := float64(player.A) - fov/2.0 + fov*float64(i)/float64(wWidth)
-					for c = 0.0; c <= 18; c += 0.05 {
+					for c = 0.0; c <= 20; c += 0.01 {
 						x := player.X + c*math.Sin(angle)
 						y := player.Y + c*math.Cos(angle)
 
 						//fmt.Println(c, "x", x, y, string([]byte(renderMap[int(x)])[int(y)]))
-						colorSign = string([]byte(renderMap[int(x)])[int(y)])
+						colorSign = renderMapCache[int(x)][int(y)]
 						if colorSign != " " {
 							break
 						}
+
 					}
+					//if time.Now().Sub(timeStart2) > timeNorm {
+					//	fmt.Println("1", time.Now().Sub(timeStart2))
+					//}
+					//timeStart2 = time.Now()
 					//fmt.Println("angle", angle, "c", c, "player.A", player.A, math.Cos(player.A), math.Sin(player.A))
 
-					if colorSign == " " {
+					if colorSign == " " || colorSign == "" {
 						continue
 					}
 					sizeY := int(wHeight / (c * math.Cos(angle - player.A)))
-					if prevSize != sizeY {
-						prevSize = sizeY
-						size0 := image.Point{5, sizeY}
-						t0, err = s.NewTexture(size0)
-						if err != nil {
-							log.Fatal(err)
-						}
-						t0.Fill(t0.Bounds(), colorMap[colorSign], screen.Src)
-						t0Rect = t0.Bounds()
+					if sizeY > wHeight {
+						sizeY = wHeight
 					}
-					w.Copy(image.Point{i, int(c)}, t0, t0Rect, op, nil)
+					if sizeY < 0 {
+						sizeY = 0
+					}
+					//if time.Now().Sub(timeStart2) > timeNorm {
+					//	fmt.Println("2", time.Now().Sub(timeStart2))
+					//}
+					//timeStart2 = time.Now()
+					w.Copy(image.Point{i, int(c)}, t0RectCache[sizeY][colorSign],
+						t0RectCache[sizeY][colorSign].Bounds(), op, nil)
+					//if time.Now().Sub(timeStart2) > timeNorm {
+					//	fmt.Println("3", time.Now().Sub(timeStart2))
+					//}
 
 				}
+				fmt.Println("render duration: ", time.Now().Sub(timeStart))
 				w.Publish()
 			case error:
 				log.Print(e)
