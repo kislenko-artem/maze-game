@@ -51,7 +51,7 @@ var (
 )
 
 func main() {
-	var player = Player{X: 1, Y: 4, A: 0}
+	var player = Player{X: 2, Y: 4, A: 0}
 	var c float64
 	const fov = 3.14 / 3.0 // field of view
 	colorMap := map[string]color.RGBA{
@@ -140,7 +140,7 @@ func main() {
 					if colorSign == " " {
 						continue
 					}
-					size0 := image.Point{1, int(500 / (c * 2))}
+					size0 := image.Point{1, int(300 / (c * math.Cos(angle - player.A)))}
 					t0, err := s.NewTexture(size0)
 					if err != nil {
 						log.Fatal(err)
@@ -148,7 +148,7 @@ func main() {
 					t0.Fill(t0.Bounds(), colorMap[colorSign], screen.Src)
 					t0Rect := t0.Bounds()
 
-					w.Copy(image.Point{i, int(500 / (c * 2))}, t0, t0Rect, op, nil)
+					w.Copy(image.Point{i, int(c)}, t0, t0Rect, op, nil)
 
 				}
 				w.Publish()

@@ -15,4 +15,4 @@
 
 **Демо ролик:**
 
-[![демо-видео](./assets/video_screen.png)](./assets/video_demo.ogg)
+[![демо-видео](./assets/video_screen.png)](./assets/video_demo.mp4)
