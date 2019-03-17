@@ -53,7 +53,11 @@ var (
 func main() {
 	var player = Player{X: 2, Y: 4, A: 0}
 	var c float64
-	const fov = 3.14 / 3.0 // field of view
+	const (
+		fov = 3.14 / 3.0 // field of view
+		wWidth = 600
+		wHeight = 400
+	)
 	colorMap := map[string]color.RGBA{
 		"0": yellow,
 		"1": green,
@@ -61,7 +65,7 @@ func main() {
 		"3": darkGray,
 	}
 	driver.Main(func(s screen.Screen) {
-		w, err := s.NewWindow(&screen.NewWindowOptions{Width: 300, Height: 300, Title: "Game"})
+		w, err := s.NewWindow(&screen.NewWindowOptions{Width: wWidth, Height: wHeight, Title: "Game"})
 		if err != nil {
 			fmt.Println(err)
 			return
@@ -114,7 +118,7 @@ func main() {
 						*rightLeft -= cosDirection
 						*backFroward -= sinDirection
 					}
-					fmt.Println("a", player.A, "cos", cosDirection, "sin", sinDirection, "x", player.X, "y", player.Y)
+					//fmt.Println("a", player.A, "cos", cosDirection, "sin", sinDirection, "x", player.X, "y", player.Y)
 					w.Send(paint.Event{})
 
 				}
@@ -122,9 +126,14 @@ func main() {
 				// https://github.com/golang/exp/blob/master/shiny/example/basic/main.go
 				colorSign := ""
 				op := screen.Src
-				w.Fill(image.Rectangle{image.Point{0, 0}, image.Point{300, 300}}, blue1, screen.Src)
-				for i := 0; i <= 300; i++ {
-					angle := float64(player.A) - fov/2.0 + fov*float64(i)/float64(300)
+				w.Fill(image.Rectangle{image.Point{0, 0}, image.Point{wWidth, wHeight}}, blue1, screen.Src)
+				var (
+					prevSize int
+					t0 screen.Texture
+					t0Rect image.Rectangle
+				)
+				for i := 0; i <= wWidth; i+=5 {
+					angle := float64(player.A) - fov/2.0 + fov*float64(i)/float64(wWidth)
 					for c = 0.0; c <= 18; c += 0.05 {
 						x := player.X + c*math.Sin(angle)
 						y := player.Y + c*math.Cos(angle)
@@ -140,14 +149,17 @@ func main() {
 					if colorSign == " " {
 						continue
 					}
-					size0 := image.Point{1, int(300 / (c * math.Cos(angle - player.A)))}
-					t0, err := s.NewTexture(size0)
-					if err != nil {
-						log.Fatal(err)
+					sizeY := int(wHeight / (c * math.Cos(angle - player.A)))
+					if prevSize != sizeY {
+						prevSize = sizeY
+						size0 := image.Point{5, sizeY}
+						t0, err = s.NewTexture(size0)
+						if err != nil {
+							log.Fatal(err)
+						}
+						t0.Fill(t0.Bounds(), colorMap[colorSign], screen.Src)
+						t0Rect = t0.Bounds()
 					}
-					t0.Fill(t0.Bounds(), colorMap[colorSign], screen.Src)
-					t0Rect := t0.Bounds()
-
 					w.Copy(image.Point{i, int(c)}, t0, t0Rect, op, nil)
 
 				}
