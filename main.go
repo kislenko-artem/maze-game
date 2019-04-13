@@ -2,31 +2,41 @@ package main
 
 import (
 	"fmt"
+	"image"
+	"image/color"
+	_ "image/png"
+	"log"
+	"math"
+	"os"
+	"strconv"
+
 	"golang.org/x/exp/shiny/driver"
 	"golang.org/x/exp/shiny/screen"
 	"golang.org/x/mobile/event/key"
 	"golang.org/x/mobile/event/lifecycle"
 	"golang.org/x/mobile/event/paint"
-	"image"
-	"image/color"
-	"log"
-	"math"
 )
 
+// Player используется для запонимания текущего местоположения игрока
 type Player struct {
-	X float64
-	Y float64
-	A float64
+	PrevX float64 // предыдущие координаты X
+	PrevY float64 // предыдущие координаты Y
+
+	X float64 // текущие координаты X
+	Y float64 // текущие координаты Y
+	A float64 // направление куда игрок смотрит
 }
 
+// TODO: выход за текстуру не проверяется
+// наша карта. Цифры здесь - это номер картинки из текустуры
 var renderMap = []string{
 	"0000000000000000",
-	"0              1",
+	"0              0",
 	"0              0",
 	"0  11111       0",
 	"0  1           0",
 	"0111           0000000",
-	"0                    0",
+	"0              3     0",
 	"0              0000000",
 	"0              0",
 	"0              0",
@@ -35,38 +45,43 @@ var renderMap = []string{
 	"0              0",
 	"0              0",
 	"0              0",
-	"0100000000000010",
+	"0222222222222220",
 }
-var (
-	white    = color.RGBA{0xff, 0xff, 0xff, 0xff}
-	blue0    = color.RGBA{0x00, 0x00, 0x1f, 0xff}
-	blue1    = color.RGBA{0x00, 0x00, 0x3f, 0xff}
-	darkGray = color.RGBA{0x3f, 0x3f, 0x3f, 0xff}
-	green    = color.RGBA{0x00, 0x7f, 0x00, 0x7f}
-	red      = color.RGBA{0x7f, 0x00, 0x00, 0x7f}
-	yellow   = color.RGBA{0x3f, 0x3f, 0x00, 0x3f}
 
-	cos30 = math.Cos(math.Pi / 6)
-	sin30 = math.Sin(math.Pi / 6)
+var (
+	white = color.RGBA{0xff, 0xff, 0xff, 0xff}
 )
 
 func main() {
 	var (
-		player = Player{X: 2, Y: 2, A: 0}
+		err            error
+		imageFile      *os.File
+		player         = Player{X: 2, Y: 2, A: 0}
 		renderMapCache = map[int]map[int]string{}
-		c float64
+		c              float64
 	)
 	const (
-		fov = 3.14 / 3.0 // field of view
-		wWidth = 800
-		wHeight = 600
+		fov           = 3.14 / 3.0 // field of view
+		wWidth        = 800
+		wHeight       = 600
+		textureSize   = 64
+		offsetTop     = 350
+		offsetBottom  = 50
+		maxVisibility = 20.0
 	)
-	colorMap := map[string]color.RGBA{
-		"0": yellow,
-		"1": green,
-		"2": red,
-		"3": darkGray,
+
+	// загрузим текстуру
+	if imageFile, err = os.Open("assets/textures.png"); err != nil {
+		log.Panic(err)
 	}
+	defer func() {
+		_ = imageFile.Close()
+	}()
+	imageData, _, err := image.Decode(imageFile)
+	if err != nil {
+		log.Panic("decode: ", err)
+	}
+
 	driver.Main(func(s screen.Screen) {
 		w, err := s.NewWindow(&screen.NewWindowOptions{Width: wWidth, Height: wHeight, Title: "Game"})
 		if err != nil {
@@ -83,7 +98,6 @@ func main() {
 			}
 		}
 
-
 		for {
 			e := w.NextEvent()
 			switch e := e.(type) {
@@ -91,6 +105,7 @@ func main() {
 				if e.To == lifecycle.StageDead {
 					return
 				}
+			// здесь управление игроком
 			case key.Event:
 				if e.Code == key.CodeEscape {
 					return
@@ -130,10 +145,10 @@ func main() {
 						*rightLeft -= cosDirection
 						*backFroward -= sinDirection
 					}
-					//fmt.Println("a", player.A, "cos", cosDirection, "sin", sinDirection, "x", player.X, "y", player.Y)
 					w.Send(paint.Event{})
 
 				}
+			// здесь рекция на события
 			case paint.Event:
 				colorSign := ""
 				if player.X < 1 {
@@ -142,29 +157,20 @@ func main() {
 				if player.Y < 1 {
 					player.Y = 1
 				}
-				if player.X > float64(len(renderMap) - 2) {
+				if player.X > float64(len(renderMap)-2) {
 					player.X = float64(len(renderMap) - 2)
 				}
-				if player.Y > float64(len(renderMap[int(player.X)]) - 2) {
+				if player.Y > float64(len(renderMap[int(player.X)])-2) {
 					player.Y = float64(len(renderMap[int(player.X)]) - 2)
 				}
 
-				//if renderMapCache[int(player.X) + 1][int(player.Y)] != " " {
-				//	player.X = player.X - 1
-				//}
-				//
-				//if renderMapCache[int(player.X) - 1][int(player.Y)] != " " {
-				//	player.X = player.X + 1
-				//}
-				//
-				//if renderMapCache[int(player.X)][int(player.Y) - 1] != " " {
-				//	player.Y = player.Y + 1
-				//}
-				//
-				//if renderMapCache[int(player.X)][int(player.Y) + 1] != " " {
-				//	player.Y = player.Y - 1
-				//}
-				size0 := image.Point{wWidth, wHeight, }
+				if renderMapCache[int(player.X)][int(player.Y)] != " " {
+					player.X = player.PrevX
+					player.Y = player.PrevY
+					break
+				}
+
+				size0 := image.Point{wWidth, wHeight}
 				imgBuf, err := s.NewBuffer(size0)
 				if err != nil {
 					log.Fatal(err)
@@ -172,12 +178,13 @@ func main() {
 				defer imgBuf.Release()
 				img := imgBuf.RGBA()
 
-				for i := 0; i <= wWidth; i+=1 {
+				for i := 0; i <= wWidth; i += 1 {
 					angle := float64(player.A) - fov/2.0 + fov*float64(i)/float64(wWidth)
-					for c = 0.0; c <= 20; c += 0.01 {
-						x := player.X + c*math.Sin(angle)
-						y := player.Y + c*math.Cos(angle)
-						colorSign = renderMapCache[int(x)][int(y)]
+					var xWall, yWall float64
+					for c = 0.0; c <= maxVisibility; c += 0.01 {
+						xWall = player.X + c*math.Sin(angle)
+						yWall = player.Y + c*math.Cos(angle)
+						colorSign = renderMapCache[int(xWall)][int(yWall)]
 						if colorSign != " " {
 							break
 						}
@@ -186,7 +193,9 @@ func main() {
 					if colorSign == " " || colorSign == "" {
 						continue
 					}
-					sizeY := int(wHeight / (c * math.Cos(angle - player.A))) + (wHeight / 5)
+
+					// определим длину текущей линии
+					sizeY := int(wHeight/(c*math.Cos(angle-player.A))) + (wHeight / 5)
 					if sizeY > wHeight {
 						sizeY = wHeight
 					}
@@ -195,16 +204,42 @@ func main() {
 					}
 
 					for b := 0; b < wHeight; b++ {
-						if b > sizeY {
+						if b < wHeight-(sizeY+offsetTop) {
 							img.SetRGBA(i, b, white)
 							continue
 						}
-						img.SetRGBA(i, b, colorMap[colorSign])
+						if b > (sizeY - offsetBottom) {
+							img.SetRGBA(i, b, white)
+							continue
+						}
+
+						// нужен, чтобы выбрать правильное изображение из текстуры
+						koef, _ := strconv.Atoi(colorSign)
+						koef = koef * textureSize
+
+						// здесь соотнесем текущие размеры и размеры текстуры
+						yPic := int(b * textureSize / (sizeY - offsetBottom))
+						xPic := int((xWall - float64(int(xWall))) * textureSize)
+						if xPic == 0 || xPic == (textureSize-1) {
+							xPic = int((yWall - float64(int(yWall))) * textureSize)
+						} else {
+							yPic = int(b-(wHeight-(sizeY+offsetTop))) * textureSize / (sizeY - offsetBottom - (wHeight - (sizeY + offsetTop)))
+						}
+
+						// нарисуем пиксель на изображении
+						colorR, colorG, colorB, colorA := imageData.At(xPic+koef, yPic).RGBA()
+						img.SetRGBA(i, b, color.RGBA{uint8(colorR), uint8(colorG), uint8(colorB), uint8(colorA)})
 					}
 
 				}
+
+				// отобразим получившееся изображение на экране
 				w.Upload(image.Point{0, 0}, imgBuf, imgBuf.Bounds())
 				w.Publish()
+
+				// запомним предудещие координаты, чтобы можно было откатиться на них
+				player.PrevX = player.X
+				player.PrevY = player.Y
 			case error:
 				log.Print(e)
 			}
