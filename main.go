@@ -150,7 +150,7 @@ func main() {
 				}
 			// здесь рекция на события
 			case paint.Event:
-				colorSign := ""
+				mapSign := ""
 				if player.X < 1 {
 					player.X = 1
 				}
@@ -179,18 +179,22 @@ func main() {
 				img := imgBuf.RGBA()
 
 				for i := 0; i <= wWidth; i += 1 {
+
+					// вычислим угол, под которым смотрим на мир
 					angle := float64(player.A) - fov/2.0 + fov*float64(i)/float64(wWidth)
 					var xWall, yWall float64
+
+					// на расстоянии видимости вычислим символ карты, на которую попадаем под этим углом
 					for c = 0.0; c <= maxVisibility; c += 0.01 {
 						xWall = player.X + c*math.Sin(angle)
 						yWall = player.Y + c*math.Cos(angle)
-						colorSign = renderMapCache[int(xWall)][int(yWall)]
-						if colorSign != " " {
+						mapSign = renderMapCache[int(xWall)][int(yWall)]
+						if mapSign != " " {
 							break
 						}
 
 					}
-					if colorSign == " " || colorSign == "" {
+					if mapSign == " " || mapSign == "" {
 						continue
 					}
 
@@ -214,7 +218,7 @@ func main() {
 						}
 
 						// нужен, чтобы выбрать правильное изображение из текстуры
-						koef, _ := strconv.Atoi(colorSign)
+						koef, _ := strconv.Atoi(mapSign)
 						koef = koef * textureSize
 
 						// здесь соотнесем текущие размеры и размеры текстуры
