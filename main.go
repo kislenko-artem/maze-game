@@ -51,7 +51,7 @@ var renderMap = []string{
 }
 
 var (
-	white = color.RGBA{0xff, 0xff, 0xff, 0xff}
+	white  = color.RGBA{0xff, 0xff, 0xff, 0xff}
 	isStop = false
 )
 
@@ -77,7 +77,7 @@ func main() {
 			return
 		}
 		defer w.Release()
-		go func () {
+		go func() {
 			for {
 				e := w.NextEvent()
 				switch e := e.(type) {
@@ -110,7 +110,7 @@ func main() {
 				break
 			}
 			frames++
-			log.Println("fps: ", frames / time.Now().Sub(timeStart).Seconds())
+			log.Println("fps: ", frames/time.Now().Sub(timeStart).Seconds())
 		}
 	})
 }
