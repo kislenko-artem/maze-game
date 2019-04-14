@@ -9,11 +9,13 @@ import (
 	"math"
 	"os"
 	"strconv"
+	"time"
 
 	"golang.org/x/exp/shiny/driver"
 	"golang.org/x/exp/shiny/screen"
 	"golang.org/x/mobile/event/key"
 	"golang.org/x/mobile/event/lifecycle"
+	"golang.org/x/mobile/event/mouse"
 	"golang.org/x/mobile/event/paint"
 )
 
@@ -98,6 +100,8 @@ func main() {
 			}
 		}
 
+		var prevX = float32(wWidth / 2)
+		pastKeyEven := time.Now()
 		for {
 			e := w.NextEvent()
 			switch e := e.(type) {
@@ -105,11 +109,47 @@ func main() {
 				if e.To == lifecycle.StageDead {
 					return
 				}
+
+			// что-то вроде управления мышью, хотя из-за ограничений движка работает криво
+			case mouse.Event:
+				var direction = "left"
+				if prevX > e.X {
+					direction = "right"
+				}
+				prevX = e.X
+				// будем контролировать скорость, при зажатой клавиши, т.к. сама библиотека слишком быстро
+				// генерирует события
+				if time.Now().Sub(pastKeyEven) < time.Millisecond * 50 {
+					break
+				}
+				pastKeyEven = time.Now()
+				if direction == "right" {
+					player.A -= 0.25
+					if player.A < -6 {
+						player.A = 0
+					}
+				}
+				if direction == "left" {
+					player.A += 0.25
+					if player.A > 6 {
+						player.A = 0
+					}
+				}
+				log.Println("mouse",  e.X, player.A, (wWidth / 2), direction)
+				w.Send(paint.Event{})
 			// здесь управление игроком
 			case key.Event:
 				if e.Code == key.CodeEscape {
 					return
 				}
+
+				// будем контролировать скорость, при зажатой клавиши, т.к. сама библиотека слишком быстро
+				// генерирует события
+				if time.Now().Sub(pastKeyEven) < time.Millisecond * 50 {
+					break
+				}
+				pastKeyEven = time.Now()
+
 
 				if e.Direction == key.DirRelease {
 					if e.Code == key.CodeLeftArrow {
@@ -126,24 +166,32 @@ func main() {
 					}
 					cosDirection := math.Round(math.Cos(player.A))
 					sinDirection := math.Round(math.Sin(player.A))
-					backFroward := &player.X
-					rightLeft := &player.Y
 
 					if e.Code == key.CodeD {
-						*rightLeft += sinDirection
-						*backFroward += cosDirection
+						if cosDirection == 0 {
+							player.Y -= sinDirection
+							player.X -= cosDirection
+						} else {
+							player.Y += sinDirection
+							player.X += cosDirection
+						}
 					}
 					if e.Code == key.CodeA {
-						*rightLeft -= sinDirection
-						*backFroward -= cosDirection
+						if cosDirection == 0 {
+							player.Y += sinDirection
+							player.X += cosDirection
+						} else {
+							player.Y -= sinDirection
+							player.X -= cosDirection
+						}
 					}
 					if e.Code == key.CodeW {
-						*rightLeft += cosDirection
-						*backFroward += sinDirection
+						player.Y += cosDirection
+						player.X += sinDirection
 					}
 					if e.Code == key.CodeS {
-						*rightLeft -= cosDirection
-						*backFroward -= sinDirection
+						player.Y -= cosDirection
+						player.X -= sinDirection
 					}
 					w.Send(paint.Event{})
 
@@ -246,6 +294,7 @@ func main() {
 				player.PrevY = player.Y
 			case error:
 				log.Print(e)
+
 			}
 		}
 	})
