@@ -6,12 +6,10 @@ import (
 	"math"
 	"time"
 
-	"golang.org/x/mobile/event/paint"
-	"golang.org/x/exp/shiny/screen"
 	"golang.org/x/mobile/event/mouse"
 )
 
-func mouseEvent (e *mouse.Event, player *Player, word *Word, w screen.Window) {
+func mouseEvent(e *mouse.Event, player *Player, word *Word) {
 	var direction = "left"
 	if word.PrevX > e.X {
 		direction = "right"
@@ -19,7 +17,7 @@ func mouseEvent (e *mouse.Event, player *Player, word *Word, w screen.Window) {
 	word.PrevX = e.X
 	// будем контролировать скорость, при зажатой клавиши, т.к. сама библиотека слишком быстро
 	// генерирует события
-	if time.Now().Sub(word.PastKeyEven) < time.Millisecond * 50 {
+	if time.Now().Sub(word.PastKeyEven) < time.Millisecond*50 {
 		return
 	}
 	word.PastKeyEven = time.Now()
@@ -35,12 +33,11 @@ func mouseEvent (e *mouse.Event, player *Player, word *Word, w screen.Window) {
 			player.A = 0
 		}
 	}
-	log.Println("mouse",  e.X, player.A, (wWidth / 2), direction)
-	w.Send(paint.Event{})
+	log.Println("mouse", e.X, player.A, (wWidth / 2), direction)
 
 }
 
-func keyEvent (e *key.Event, player *Player, word *Word, w screen.Window) {
+func keyEvent(e *key.Event, player *Player, word *Word) {
 	if e.Code == key.CodeEscape {
 		return
 	}
@@ -94,6 +91,5 @@ func keyEvent (e *key.Event, player *Player, word *Word, w screen.Window) {
 			player.Y -= cosDirection
 			player.X -= sinDirection
 		}
-		w.Send(paint.Event{})
 	}
 }

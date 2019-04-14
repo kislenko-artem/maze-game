@@ -1,14 +1,9 @@
 package main
 
 import (
-	"fmt"
-	"image"
 	"image/color"
 	_ "image/png"
 	"log"
-	"math"
-	"os"
-	"strconv"
 	"time"
 
 	"golang.org/x/exp/shiny/driver"
@@ -16,12 +11,11 @@ import (
 	"golang.org/x/mobile/event/key"
 	"golang.org/x/mobile/event/lifecycle"
 	"golang.org/x/mobile/event/mouse"
-	"golang.org/x/mobile/event/paint"
 )
 
 // Word храним данные мира
 type Word struct {
-	PrevX float32
+	PrevX       float32
 	PastKeyEven time.Time
 }
 
@@ -58,8 +52,8 @@ var renderMap = []string{
 
 var (
 	white = color.RGBA{0xff, 0xff, 0xff, 0xff}
+	isStop = false
 )
-
 
 const (
 	fov           = 3.14 / 3.0 // field of view
@@ -71,66 +65,52 @@ const (
 	maxVisibility = 20.0
 )
 
-
-
 func main() {
 	var (
-		err            error
-		imageFile      *os.File
-		player         = Player{X: 2, Y: 2, A: 0}
-		renderMapCache = map[int]map[int]string{}
-		c              float64
+		player = Player{X: 2, Y: 2, A: 0}
+		word   = Word{PrevX: float32(wWidth / 2), PastKeyEven: time.Now()}
 	)
 
-	// загрузим текстуру
-	if imageFile, err = os.Open("assets/textures.png"); err != nil {
-		log.Panic(err)
-	}
-	defer func() {
-		_ = imageFile.Close()
-	}()
-	imageData, _, err := image.Decode(imageFile)
-	if err != nil {
-		log.Panic("decode: ", err)
-	}
-	word := Word{PrevX: float32(wWidth / 2), PastKeyEven: time.Now()}
 	driver.Main(func(s screen.Screen) {
 		w, err := s.NewWindow(&screen.NewWindowOptions{Width: wWidth, Height: wHeight, Title: "Game"})
 		if err != nil {
-			fmt.Println(err)
 			return
 		}
 		defer w.Release()
+		go func () {
+			for {
+				e := w.NextEvent()
+				switch e := e.(type) {
+				case lifecycle.Event:
+					if e.To == lifecycle.StageDead {
+						isStop = true
+						return
+					}
+				// что-то вроде управления мышью, хотя из-за ограничений движка работает криво
+				// TODO: захват мыши окном
+				case mouse.Event:
+					mouseEvent(&e, &player, &word)
+				// здесь управление игроком
+				// TODO: нужно писать свой обработчик нажатия клавиш (чтобы можно было нажимать две одновременно)
+				case key.Event:
+					keyEvent(&e, &player, &word)
+				case error:
+					log.Print(e)
 
-		// кеширование  карты
-		for x := 0; x < len(renderMap); x++ {
-			renderMapCache[x] = map[int]string{}
-			for y := 0; y < len(renderMap[x]); y++ {
-				renderMapCache[x][y] = string([]byte(renderMap[int(x)])[int(y)])
-			}
-		}
-
-		for {
-			e := w.NextEvent()
-			switch e := e.(type) {
-			case lifecycle.Event:
-				if e.To == lifecycle.StageDead {
-					return
 				}
-			// что-то вроде управления мышью, хотя из-за ограничений движка работает криво
-			// TODO: зхват мышью
-			case mouse.Event:
-				mouseEvent(&e, &player, &word, w)
-			// здесь управление игроком
-			// TODO: нужно писать свой обработчик нажатия клавиш (чтобы можно было нажимать две одновременно)
-			case key.Event:
-				keyEvent(&e, &player, &word, w)
-			// здесь рекция на события
-			case paint.Event:
-			case error:
-				log.Print(e)
-
 			}
+		}()
+
+		ticker := time.NewTicker(20 * time.Millisecond)
+		timeStart := time.Now()
+		var frames float64
+		for range ticker.C {
+			paintScreen(&player, s, w)
+			if isStop == true {
+				break
+			}
+			frames++
+			log.Println("fps: ", frames / time.Now().Sub(timeStart).Seconds())
 		}
 	})
 }

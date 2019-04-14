@@ -5,13 +5,49 @@ import (
 	"image/color"
 	"log"
 	"math"
+	"os"
 	"strconv"
 
 	"golang.org/x/exp/shiny/screen"
 )
 
-func painScreen(player *Player, word *Word, w screen.Window) {
+var (
+	renderMapCache map[int]map[int]string
+	imageData      image.Image
+)
 
+func init() {
+	var (
+		err       error
+		imageFile *os.File
+	)
+
+	renderMapCache = map[int]map[int]string{}
+	// загрузим текстуру
+	if imageFile, err = os.Open("assets/textures.png"); err != nil {
+		log.Panic(err)
+	}
+	defer func() {
+		_ = imageFile.Close()
+	}()
+	imageData, _, err = image.Decode(imageFile)
+	if err != nil {
+		log.Panic("decode: ", err)
+	}
+
+	// кеширование  карты
+	for x := 0; x < len(renderMap); x++ {
+		renderMapCache[x] = map[int]string{}
+		for y := 0; y < len(renderMap[x]); y++ {
+			renderMapCache[x][y] = string([]byte(renderMap[int(x)])[int(y)])
+		}
+	}
+}
+
+func paintScreen(player *Player, s screen.Screen, w screen.Window) {
+	var (
+		c float64
+	)
 	mapSign := ""
 	if player.X < 1 {
 		player.X = 1
@@ -29,7 +65,7 @@ func painScreen(player *Player, word *Word, w screen.Window) {
 	if renderMapCache[int(player.X)][int(player.Y)] != " " {
 		player.X = player.PrevX
 		player.Y = player.PrevY
-		break
+		return
 	}
 
 	size0 := image.Point{wWidth, wHeight}
