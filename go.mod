@@ -20,6 +20,7 @@ require (
 	github.com/oakmound/oak v2.0.0+incompatible // indirect
 	github.com/oakmound/shiny v0.2.0 // indirect
 	github.com/pkg/errors v0.8.1 // indirect
+	github.com/veandco/go-sdl2 v0.3.0 // indirect
 	golang.org/x/exp v0.0.0-20190316020145-860388717186
 	golang.org/x/mobile v0.0.0-20190316150407-cde3d952bcf0
 	golang.org/x/sync v0.0.0-20190227155943-e225da77a7e6 // indirect
