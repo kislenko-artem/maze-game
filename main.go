@@ -36,8 +36,8 @@ var renderMap = []string{
 	"0              0",
 	"0              0",
 	"0  11111       0",
-	"0  1           0",
-	"0111           0000000",
+	"0              0",
+	"0              0000000",
 	"0              3     0",
 	"0              0000000",
 	"0              0",
@@ -70,6 +70,7 @@ func main() {
 		offsetTop     = 350
 		offsetBottom  = 50
 		maxVisibility = 20.0
+		step          = 0.25
 	)
 
 	// загрузим текстуру
@@ -119,23 +120,23 @@ func main() {
 				prevX = e.X
 				// будем контролировать скорость, при зажатой клавиши, т.к. сама библиотека слишком быстро
 				// генерирует события
-				if time.Now().Sub(pastKeyEven) < time.Millisecond * 50 {
+				if time.Now().Sub(pastKeyEven) < time.Millisecond*50 {
 					break
 				}
 				pastKeyEven = time.Now()
 				if direction == "right" {
-					player.A -= 0.25
+					player.A -= step
 					if player.A < -6 {
 						player.A = 0
 					}
 				}
 				if direction == "left" {
-					player.A += 0.25
+					player.A += step
 					if player.A > 6 {
 						player.A = 0
 					}
 				}
-				log.Println("mouse",  e.X, player.A, (wWidth / 2), direction)
+				log.Println("mouse", e.X, player.A, (wWidth / 2), direction)
 				w.Send(paint.Event{})
 			// здесь управление игроком
 			case key.Event:
@@ -145,21 +146,20 @@ func main() {
 
 				// будем контролировать скорость, при зажатой клавиши, т.к. сама библиотека слишком быстро
 				// генерирует события
-				if time.Now().Sub(pastKeyEven) < time.Millisecond * 50 {
+				if time.Now().Sub(pastKeyEven) < time.Millisecond*50 {
 					break
 				}
 				pastKeyEven = time.Now()
 
-
 				if e.Direction == key.DirRelease {
 					if e.Code == key.CodeLeftArrow {
-						player.A -= 0.25
+						player.A -= step
 						if player.A < -6 {
 							player.A = 0
 						}
 					}
 					if e.Code == key.CodeRightArrow {
-						player.A += 0.25
+						player.A += step
 						if player.A > 6 {
 							player.A = 0
 						}
@@ -255,33 +255,35 @@ func main() {
 						sizeY = 0
 					}
 
-					for b := 0; b < wHeight; b++ {
-						if b < wHeight-(sizeY+offsetTop) {
-							img.SetRGBA(i, b, white)
-							continue
-						}
-						if b > (sizeY - offsetBottom) {
-							img.SetRGBA(i, b, white)
-							continue
-						}
+					go func(sizeY, wHeight, i int, xWall, yWall float64, mapSign string) {
+						for b := 0; b < wHeight; b++ {
+							if b < wHeight-(sizeY+offsetTop) {
+								img.SetRGBA(i, b, white)
+								continue
+							}
+							if b > (sizeY - offsetBottom) {
+								img.SetRGBA(i, b, white)
+								continue
+							}
 
-						// нужен, чтобы выбрать правильное изображение из текстуры
-						koef, _ := strconv.Atoi(mapSign)
-						koef = koef * textureSize
+							// нужен, чтобы выбрать правильное изображение из текстуры
+							koef, _ := strconv.Atoi(mapSign)
+							koef = koef * textureSize
 
-						// здесь соотнесем текущие размеры и размеры текстуры
-						yPic := int(b * textureSize / (sizeY - offsetBottom))
-						xPic := int((xWall - float64(int(xWall))) * textureSize)
-						if xPic == 0 || xPic == (textureSize-1) {
-							xPic = int((yWall - float64(int(yWall))) * textureSize)
-						} else {
-							yPic = int(b-(wHeight-(sizeY+offsetTop))) * textureSize / (sizeY - offsetBottom - (wHeight - (sizeY + offsetTop)))
+							// здесь соотнесем текущие размеры и размеры текстуры
+							yPic := int(b * textureSize / (sizeY - offsetBottom))
+							xPic := int((xWall - float64(int(xWall))) * textureSize)
+							if xPic == 0 || xPic == (textureSize-1) {
+								xPic = int((yWall - float64(int(yWall))) * textureSize)
+							} else {
+								yPic = int(b-(wHeight-(sizeY+offsetTop))) * textureSize / (sizeY - offsetBottom - (wHeight - (sizeY + offsetTop)))
+							}
+
+							// нарисуем пиксель на изображении
+							colorR, colorG, colorB, colorA := imageData.At(xPic+koef, yPic).RGBA()
+							img.SetRGBA(i, b, color.RGBA{uint8(colorR), uint8(colorG), uint8(colorB), uint8(colorA)})
 						}
-
-						// нарисуем пиксель на изображении
-						colorR, colorG, colorB, colorA := imageData.At(xPic+koef, yPic).RGBA()
-						img.SetRGBA(i, b, color.RGBA{uint8(colorR), uint8(colorG), uint8(colorB), uint8(colorA)})
-					}
+					}(sizeY, wHeight, i, xWall, yWall, mapSign)
 
 				}
 
